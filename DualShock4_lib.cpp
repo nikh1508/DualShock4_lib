@@ -9,65 +9,122 @@
 #endif
 
 void DualShock4::serialFlush() {
-    while(port->available())
-        char ch = port->read();
+    while(port.available() > 0)
+        char ch = port.read();
 }
 
 bool DualShock4::serialBreak(){
     unsigned long long lastTime = millis();
-    while(!port->available() && (millis() - lastTime) < serialTimeout);
-    return (port->available() > 0);
+    while(!port.available() && ((millis() - lastTime) < serialTimeout));
+    return (port.available() > 0);
 }
 
-bool DualShock4::readBytes(byte data[], int n, byte toSend) {
-    serialFlush();
-    port->write(toSend);
-    for(int i = 0 ; i < n ; i++){
-        if (!serialBreak())
-            return false;
-        else data[i] = port->read();
+void DualShock4::decodeData(byte toDecode[], byte totalRecvd, byte& decodedByteCount, byte decodedBytes[]) {
+    for(int i = 1 ; i < (totalRecvd - 1) ; i++) {
+        byte x = toDecode[i];
+        if(x == specialByte) 
+            x += toDecode[++i];
+        decodedBytes[decodedByteCount++] = x;
     }
 }
 
-void DualShock4::readLeftAxis() {
+bool DualShock4::readBytes(byte data[], byte toRead, char toSend) {
+    static bool firstCall = true;
+    static bool inProgress = false;
+    static byte bytesRecvd = 0;
+    static byte tempBuffer[20];
+    static long long lastRead;
+    if(firstCall) {
+        firstCall = false;
+        serialFlush();
+        port.print(toSend);
+        lastRead = millis();
+    }
+    
+    while(port.available()) {
+        byte x = port.read();
+        lastRead = millis();
+        if(x == startMarker) {
+            inProgress = true;
+            bytesRecvd = 0;
+        }
+        if(inProgress) 
+            tempBuffer[bytesRecvd++] = x;
+        if(x == endMarker) {
+            inProgress = false;
+            firstCall = true;
+            byte decodedByteCount = 0;
+            decodeData(tempBuffer, bytesRecvd, decodedByteCount, data);
+            if(decodedByteCount == toRead)
+                return true;
+            else
+                debug("Received Incorrect Bytes in :: " + String(int(toSend)));
+        }
+    }
+    if((millis() - lastRead) > 50){
+            debug("SERIAL TIMEOUT");
+            firstCall = true;
+        }
+    return false;
+}
+
+bool DualShock4::readLeftStick() {
     if(mode == AUTOMATIC && (millis() - lastCall[0]) < sampleTime)
         return;
     byte data[4];
     lastCall[0] = millis();
-    readBytes(data, 4, LX);
-    LX_val = data[0] << 8 | data[1];
-    LY_val = data[2] << 8 | data[3];
+    if(readBytes(data, 4, LX)){
+        LX_val = data[0] << 8 | data[1];
+        LY_val = data[2] << 8 | data[3];
+        return true;
+    }
+    return false;
 }
 
-void DualShock4::readRightAxis() {
-    if(mode == AUTOMATIC && (millis() - lastCall[1]) < sampleTime)
-        return;
-    lastCall[1] = millis();
+bool DualShock4::readRightStick() {
+    // if(mode == AUTOMATIC && (millis() - lastCall[1]) < sampleTime)
+    //     return;
+    // lastCall[1] = millis();
     byte data[4];
-    readBytes(data, 4, RX);
-    RX_val = data[0] << 8 | data[1];
-    RY_val = data[2] << 8 | data[3];
+    if(readBytes(data, 4, RX)){
+        RX_val = data[0] << 8 | data[1];
+        RY_val = data[2] << 8 | data[3];
+        return true;
+    }
+    return false;
 }
 
-void DualShock4::readButtons() {
-    if(mode == AUTOMATIC && (millis() - lastCall[2]) < sampleTime)
-        return;
-    lastCall[2] = millis();
+bool DualShock4::readButtons() {
+    // if(mode == AUTOMATIC && (millis() - lastCall[2]) < sampleTime)
+    //     return;
+    // lastCall[2] = millis();
     byte data[3];
-    readBytes(data, 3, BUTTONS);
-    lastButtons = buttons;
-    buttons = 0;
-    buttons = (data[0] << 16 | data[1] << 8) | data[2];
+    if(readBytes(data, 3, BUTTONS)){
+        lastButtons = buttons;
+        buttons = 0;
+        buttons = (long)data[0] << 16 | (long)data[1] << 8 | data[2];
+        // Serial.print((int)data[0]);
+        // Serial.print("\t");
+        // Serial.print((int)data[1]);
+        // Serial.print("\t");
+        // Serial.println((int)data[2]);
+        // Serial.println(buttons);
+        return true;
+    }
+    return false;
 }
 
-void DualShock4::readTriggers() {
-    if(mode == AUTOMATIC && (millis() - lastCall[3]) < sampleTime)
-        return;
-    lastCall[3] = millis();
+bool DualShock4::readTriggers() {
+    // if(mode == AUTOMATIC && (millis() - lastCall[3]) < sampleTime)
+    //     return;
+    // lastCall[3] = millis();
     byte data[4];
-    readBytes(data, 4, RX);
-    TRIG_L_val = data[0] << 8 | data[1];
-    TRIG_R_val = data[2] << 8 | data[3];
+    if(readBytes(data, 4, TRIG_L)) {
+        TRIG_L_val = data[0] << 8 | data[1];
+        TRIG_R_val = data[2] << 8 | data[3];
+        return true;
+    }
+    return false;
 }
 
 void DualShock4::setSampleTime(unsigned int newSampleTime) {
@@ -78,13 +135,45 @@ void DualShock4::setImuState(bool newState) {
     imuState = newState;
 }
 
+/*
 void DualShock4::readGamepad() {
-    if(mode == AUTOMATIC)
-        return;
-    readLeftAxis();
-    readRightAxis();
-    readButtons();
-    readTriggers();
+    static bool leftStick = true;
+    static bool rightStick = false;
+    static bool buttons = false;
+    static bool triggers = false;
+    bool transmissionCompleted = false;
+    if(leftStick) {
+        transmissionCompleted = readLeftStick();
+        if(transmissionCompleted){
+            leftStick = false;
+            rightStick = true;
+        }
+    }
+    if(rightStick) {
+        transmissionCompleted = readRightStick();
+        if(transmissionCompleted){
+            rightStick = false;
+            buttons = true;
+        }
+    }
+    if(buttons) {
+        transmissionCompleted = readButtons();
+        if(transmissionCompleted){
+            buttons = false;
+            triggers = true;
+        }
+    }
+    if(triggers) {
+        transmissionCompleted = readTriggers();
+        if(transmissionCompleted){
+            triggers = false;
+            leftStick = true;
+        }
+    }
+}
+*/
+bool DualShock4::readGamepad() {
+    return readButtons();
 }
 
 bool DualShock4::newButtonState() {
@@ -120,22 +209,22 @@ bool DualShock4::buttonReleased(unsigned int button) {
     switch(stick) {
         case LX :
             if(mode == AUTOMATIC)
-                readLeftAxis();
+                readLeftStick();
             return LX_val;
             break;
         case LY :
             if(mode == AUTOMATIC)
-                readLeftAxis();
+                readLeftStick();
             return LY_val;
             break;
         case RX :
             if(mode == AUTOMATIC)
-                readRightAxis();
+                readRightStick();
             return RX_val;
             break;
         case RY :
             if(mode == AUTOMATIC)
-                readRightAxis();
+                readRightStick();
             return RY_val;
             break;
         default :
@@ -156,4 +245,10 @@ int DualShock4::trigger(unsigned int trig) {
         default :
             return 0;
     }
+ }
+
+ void DualShock4::debug(String errorMessage) {
+    #ifdef DualShock4_lib_DEBUG
+        Serial.println(errorMessage);
+    #endif
  }

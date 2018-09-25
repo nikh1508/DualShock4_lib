@@ -1,7 +1,7 @@
 #ifndef DualShock4_h
     #define DualShock4_h
 #endif
-
+#define DualShock4_lib_DEBUG
 #if ARDUINO > 22
     #include <Arduino.h>
 #else
@@ -12,7 +12,13 @@
 
 #define MANUAL false
 #define AUTOMATIC true
+// #define port Serial2
 
+enum devices {LX = 101, LY, RX, RY, BUTTONS, TRIG_L, TRIG_R};
+enum buttons_list {R2 = 0, R1, L2, L1, CIRCLE, SQUARE, CROSS, TRIANGLE, RB, LB, PS, OPTIONS, TOUCHPAD, SHARE, HAT_RIGHT, HAT_LEFT, DOWN, UP};
+constexpr byte startMarker = 254;
+constexpr byte endMarker = 255;
+constexpr byte specialByte = 253;
 
 class DualShock4 {
     int LX_val;
@@ -24,38 +30,39 @@ class DualShock4 {
     int TRIG_L_val;
     int TRIG_R_val;
     unsigned int sampleTime;                            //usable only in AUTOMATIC mode
-    HardwareSerial *port;
+    HardwareSerial &port;
     unsigned int newBaudRate;
     bool mode;
     bool imuState;
     long serialTimeout;
-    enum devices {LX = 101, LY, RX, RY, BUTTONS, TRIG_L, TRIG_R};
-    enum buttons_list {R2 = 0, R1, L2, L1, CIRCLE, SQUARE, CROSS, TRIANGLE, RB, LB, PS, OPTIONS, TOUCHPAD, SHARE, RIGHT, LEFT, DOWN, UP};
     unsigned long long lastCall[4] = {0};
 
     void serialFlush();
     bool serialBreak();                                 //the timeout depends on serialTimeOut value
-    bool readBytes(byte[], int, byte);
-    void readLeftAxis();
-    void readRightAxis();
-    void readButtons();
-    void readTriggers();
+    bool readBytes(byte[], byte, char);
+    void decodeData(byte[], byte, byte&, byte[]);
+    bool readLeftStick();
+    bool readRightStick();
+    bool readButtons();
+    bool readTriggers();
+    void debug(String);
 
     public:
 
-    DualShock4(HardwareSerial newPort = Serial1, int newBaudRate = 115200, bool newMode = MANUAL) {
-        mode = newMode;
-        port = &newPort;
+    DualShock4(HardwareSerial &newPort = Serial1, long newBaudRate = 115200, bool newMode = MANUAL) 
+    : port(newPort)
+    {
+        mode = newMode;  
         LX_val = LY_val = RX_val = RY_val = buttons = lastButtons = TRIG_L_val = TRIG_R_val = 0;
         sampleTime = 30;
         serialTimeout = 100;
         imuState = false;
-        port->begin(newBaudRate);
+        port.begin(newBaudRate);
     }
-
+    
     void setSampleTime(unsigned int);
     void setImuState(bool);
-    void readGamepad();
+    bool readGamepad();
     bool newButtonState();
     bool newButtonState(unsigned int);
     bool button(unsigned int);
