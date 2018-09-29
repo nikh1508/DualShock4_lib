@@ -6,7 +6,7 @@ import threading
 ###################################################################################
 
 analogStick = {"LX" : [0, 0.0], "LY" : [1, 0.0], "RX" : [2, 0.0], "RY" : [5, 0.0]}
-triggers = {"L_TRIG" : [3, -1.0], "R_TRIG" : [4, -1.0]}
+triggers = {"TRIG_L" : [3, -1.0], "TRIG_R" : [4, -1.0]}
 imuData = {"AX" : [7, 0.0], "AY" : [6, 0.0], "AZ" : [8, 0.0], "GX" : [11, 0.0], "GY" : [9, 0.0], "GZ" : [10, 0.0]}
 buttons = {"TRIANGLE" : [3, 0], "CROSS" : [1, 0], "SQUARE" : [0, 0], "CIRCLE" : [2, 0], "L1" : [4, 0], "L2" : [6, 0], "R1" : [5, 0],
 			"R2" : [7, 0], "LB" : [10, 0], "RB" : [11, 0], "SHARE" : [8, 0], "OPTIONS" : [9, 0], "PS" : [12, 0], "TOUCHPAD" : [13, 0]}
@@ -110,9 +110,9 @@ def Main():
 	Thread2.start()
 
 grab_data(triggers, ds4.get_axis)
-if triggers["L_TRIG"][1] != -1.0 or triggers["R_TRIG"][1] != -1.0:
+if triggers["TRIG_L"][1] != -1.0 or triggers["TRIG_R"][1] != -1.0:
 	print("Press Left and Right Triggers once to start.")
-	while(not(triggers["L_TRIG"][1] == -1.0 and triggers["R_TRIG"][1] == -1.0)):
+	while(not(triggers["TRIG_L"][1] == -1.0 and triggers["TRIG_R"][1] == -1.0)):
 		event = len(pygame.event.get())
 		if  event > 1:
 			grab_data(triggers, ds4.get_axis)

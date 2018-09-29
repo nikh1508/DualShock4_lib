@@ -10,9 +10,8 @@
 
 #include <HardwareSerial.h>
 
-#define MANUAL false
-#define AUTOMATIC true
-// #define port Serial2
+#define MANUAL_UPDATE false
+#define AUTOMATIC_UPDATE true
 
 enum devices {LX = 101, LY, RX, RY, BUTTONS, TRIG_L, TRIG_R};
 enum buttons_list {R2 = 0, R1, L2, L1, CIRCLE, SQUARE, CROSS, TRIANGLE, RB, LB, PS, OPTIONS, TOUCHPAD, SHARE, HAT_RIGHT, HAT_LEFT, DOWN, UP};
@@ -21,14 +20,14 @@ constexpr byte endMarker = 255;
 constexpr byte specialByte = 253;
 
 class DualShock4 {
-    int LX_val;
-    int LY_val;
-    int RX_val;
-    int RY_val;
+    unsigned int LX_val;
+    unsigned int LY_val;
+    unsigned int RX_val;
+    unsigned int RY_val;
     unsigned long buttons;
     unsigned long lastButtons;
-    int TRIG_L_val;
-    int TRIG_R_val;
+    unsigned int TRIG_L_val;
+    unsigned int TRIG_R_val;
     unsigned int sampleTime;                            //usable only in AUTOMATIC mode
     HardwareSerial &port;
     unsigned int newBaudRate;
@@ -49,7 +48,7 @@ class DualShock4 {
 
     public:
 
-    DualShock4(HardwareSerial &newPort = Serial1, long newBaudRate = 115200, bool newMode = MANUAL) 
+    DualShock4(HardwareSerial &newPort = Serial1, long newBaudRate = 115200, bool newMode = MANUAL_UPDATE) 
     : port(newPort)
     {
         mode = newMode;  
@@ -68,6 +67,6 @@ class DualShock4 {
     bool button(unsigned int);
     bool buttonPressed(unsigned int);
     bool buttonReleased(unsigned int);
-    int axis(unsigned int);
-    int trigger(unsigned int);
+    unsigned int axis(unsigned int);
+    unsigned int trigger(unsigned int);
 };

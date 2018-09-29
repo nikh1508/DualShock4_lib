@@ -7,6 +7,7 @@
 #else
     #include <WProgram.h>
 #endif
+#include<PID_v1.h>
 
 void DualShock4::serialFlush() {
     while(port.available() > 0)
@@ -69,10 +70,10 @@ bool DualShock4::readBytes(byte data[], byte toRead, char toSend) {
 }
 
 bool DualShock4::readLeftStick() {
-    if(mode == AUTOMATIC && (millis() - lastCall[0]) < sampleTime)
-        return;
-    byte data[4];
+    // if(mode == AUTOMATIC_UPDATE && (millis() - lastCall[0]) < sampleTime)
+    //     return;
     lastCall[0] = millis();
+    byte data[4];
     if(readBytes(data, 4, LX)){
         LX_val = data[0] << 8 | data[1];
         LY_val = data[2] << 8 | data[3];
@@ -82,7 +83,7 @@ bool DualShock4::readLeftStick() {
 }
 
 bool DualShock4::readRightStick() {
-    // if(mode == AUTOMATIC && (millis() - lastCall[1]) < sampleTime)
+    // if(mode == AUTOMATIC_UPDATE && (millis() - lastCall[1]) < sampleTime)
     //     return;
     // lastCall[1] = millis();
     byte data[4];
@@ -95,7 +96,7 @@ bool DualShock4::readRightStick() {
 }
 
 bool DualShock4::readButtons() {
-    // if(mode == AUTOMATIC && (millis() - lastCall[2]) < sampleTime)
+    // if(mode == AUTOMATIC_UPDATE && (millis() - lastCall[2]) < sampleTime)
     //     return;
     // lastCall[2] = millis();
     byte data[3];
@@ -103,19 +104,13 @@ bool DualShock4::readButtons() {
         lastButtons = buttons;
         buttons = 0;
         buttons = (long)data[0] << 16 | (long)data[1] << 8 | data[2];
-        // Serial.print((int)data[0]);
-        // Serial.print("\t");
-        // Serial.print((int)data[1]);
-        // Serial.print("\t");
-        // Serial.println((int)data[2]);
-        // Serial.println(buttons);
         return true;
     }
     return false;
 }
 
 bool DualShock4::readTriggers() {
-    // if(mode == AUTOMATIC && (millis() - lastCall[3]) < sampleTime)
+    // if(mode == AUTOMATIC_UPDATE && (millis() - lastCall[3]) < sampleTime)
     //     return;
     // lastCall[3] = millis();
     byte data[4];
@@ -135,16 +130,18 @@ void DualShock4::setImuState(bool newState) {
     imuState = newState;
 }
 
-/*
-void DualShock4::readGamepad() {
+
+bool DualShock4::readGamepad() {
     static bool leftStick = true;
     static bool rightStick = false;
     static bool buttons = false;
     static bool triggers = false;
     bool transmissionCompleted = false;
+    bool newData = false;
     if(leftStick) {
         transmissionCompleted = readLeftStick();
         if(transmissionCompleted){
+            newData = true;
             leftStick = false;
             rightStick = true;
         }
@@ -152,6 +149,7 @@ void DualShock4::readGamepad() {
     if(rightStick) {
         transmissionCompleted = readRightStick();
         if(transmissionCompleted){
+            newData = true;
             rightStick = false;
             buttons = true;
         }
@@ -159,6 +157,7 @@ void DualShock4::readGamepad() {
     if(buttons) {
         transmissionCompleted = readButtons();
         if(transmissionCompleted){
+            newData = true;
             buttons = false;
             triggers = true;
         }
@@ -166,64 +165,62 @@ void DualShock4::readGamepad() {
     if(triggers) {
         transmissionCompleted = readTriggers();
         if(transmissionCompleted){
+            newData = true;
             triggers = false;
             leftStick = true;
         }
     }
-}
-*/
-bool DualShock4::readGamepad() {
-    return readButtons();
+    return newData;
 }
 
 bool DualShock4::newButtonState() {
-    if(mode == AUTOMATIC)
+    if(mode == AUTOMATIC_UPDATE)
         readButtons();
     return ((lastButtons ^ buttons) > 0);
 }
 
 bool DualShock4::newButtonState(unsigned int button) {
-    if(mode == AUTOMATIC)
+    if(mode == AUTOMATIC_UPDATE)
         readButtons();
     return (((lastButtons ^ buttons) >> button) & 1);
 }
 
 bool DualShock4::button(unsigned int button) {
-    if(mode == AUTOMATIC)
+    if(mode == AUTOMATIC_UPDATE)
         readButtons();
     return ((buttons >> button) & 1);
 }
 bool DualShock4::buttonPressed(unsigned int button) {
-    if(mode == AUTOMATIC)
+    if(mode == AUTOMATIC_UPDATE)
         readButtons();
     return (newButtonState(button) & this->button(button));
 }
 
 bool DualShock4::buttonReleased(unsigned int button) {
-    if(mode == AUTOMATIC)
+    if(mode == AUTOMATIC_UPDATE)
         readButtons();
     return (newButtonState(button) & !this->button(button));
  }
 
- int DualShock4::axis(unsigned int stick) {
+ unsigned int DualShock4::axis(unsigned int stick) {
     switch(stick) {
         case LX :
-            if(mode == AUTOMATIC)
+            if(mode == AUTOMATIC_UPDATE)
                 readLeftStick();
             return LX_val;
             break;
         case LY :
-            if(mode == AUTOMATIC)
+            if(mode == AUTOMATIC_UPDATE)
                 readLeftStick();
             return LY_val;
             break;
         case RX :
-            if(mode == AUTOMATIC)
+            if(mode == AUTOMATIC_UPDATE)
                 readRightStick();
             return RX_val;
             break;
         case RY :
-            if(mode == AUTOMATIC)
+            if(mode == AUTOMATIC_UPDATE)
                 readRightStick();
             return RY_val;
             break;
@@ -232,8 +229,8 @@ bool DualShock4::buttonReleased(unsigned int button) {
     }
  }
 
-int DualShock4::trigger(unsigned int trig) {
-    if(mode == AUTOMATIC)
+unsigned int DualShock4::trigger(unsigned int trig) {
+    if(mode == AUTOMATIC_UPDATE)
         readTriggers();
     switch(trig) {
         case TRIG_L :
